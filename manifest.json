@@ -1,0 +1,153 @@
+{
+  "$schema": "https://raw.githubusercontent.com/anthropics/mcpb/main/schemas/mcpb-manifest-v0.3.schema.json",
+  "manifest_version": "0.3",
+  "name": "chatpush-mcp-server",
+  "display_name": "ChatPush",
+  "version": "1.0.0",
+  "description": "Send WhatsApp, Telegram, SMS and MAX messages, files and bulk mailings via ChatPush",
+  "long_description": "Official ChatPush extension. Lets Claude send text messages and files through WhatsApp, a personal Telegram account, Telegram bots, SMS, VK/OK and MAX — with channel cascades, scheduling and bulk mailings — check delivery status, look up phone numbers, manage webhooks, rename chat contacts, connect messengers and manage sub-clients. Requires a ChatPush token from https://chatpush.ru.",
+  "author": {
+    "name": "ChatPush",
+    "email": "support@chatpush.ru",
+    "url": "https://github.com/ChatPush"
+  },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/ChatPush/mcp-chatpush"
+  },
+  "homepage": "https://chatpush.ru",
+  "documentation": "https://github.com/ChatPush/mcp-chatpush#readme",
+  "support": "https://github.com/ChatPush/mcp-chatpush/issues",
+  "icon": "icon.png",
+  "server": {
+    "type": "node",
+    "entry_point": "dist/index.js",
+    "mcp_config": {
+      "command": "node",
+      "args": [
+        "${__dirname}/dist/index.js"
+      ],
+      "env": {
+        "CHATPUSH_TOKEN": "${user_config.chatpush_token}",
+        "CHATPUSH_BASE_URL": "${user_config.chatpush_base_url}"
+      }
+    }
+  },
+  "tools": [
+    {
+      "name": "get_account",
+      "description": "Full account info: balance, dispatch routing, sender names, subscription and messenger sessions"
+    },
+    {
+      "name": "get_balance",
+      "description": "Balance, customer ID, dispatch routing channels and sender names"
+    },
+    {
+      "name": "get_utm_tags",
+      "description": "List UTM tags used to track dispatches"
+    },
+    {
+      "name": "send_message",
+      "description": "Send a text via WhatsApp, Telegram, Telegram Bot, SMS, VK/OK or MAX with cascade and scheduling"
+    },
+    {
+      "name": "send_bulk",
+      "description": "Send the same message to many phone numbers at once"
+    },
+    {
+      "name": "get_delivery_status",
+      "description": "Status and details of a delivery"
+    },
+    {
+      "name": "delete_delivery",
+      "description": "Delete a delivered WhatsApp/Telegram message on all devices"
+    },
+    {
+      "name": "get_phone_info",
+      "description": "Country, operator and normalized format of a phone number"
+    },
+    {
+      "name": "send_file",
+      "description": "Send a document, image, audio or video file"
+    },
+    {
+      "name": "create_webhook",
+      "description": "Subscribe a URL to incoming messages, statuses and login events"
+    },
+    {
+      "name": "get_webhook",
+      "description": "Details of one webhook"
+    },
+    {
+      "name": "list_webhooks",
+      "description": "All registered webhooks"
+    },
+    {
+      "name": "delete_webhook",
+      "description": "Delete a webhook"
+    },
+    {
+      "name": "update_webhook",
+      "description": "Change a webhook's URL or event types"
+    },
+    {
+      "name": "set_chat_client_name",
+      "description": "Rename a contact in the ChatPush web messenger"
+    },
+    {
+      "name": "get_messenger_auth_link",
+      "description": "Link to the QR page that connects WhatsApp or personal Telegram"
+    },
+    {
+      "name": "create_sub_customer",
+      "description": "Create a sub-client with its own token (multi-account)"
+    },
+    {
+      "name": "list_sub_customers",
+      "description": "List sub-clients with subscription and messenger status"
+    },
+    {
+      "name": "get_sub_customer",
+      "description": "Details of one sub-client by customer_id"
+    }
+  ],
+  "keywords": [
+    "whatsapp",
+    "telegram",
+    "sms",
+    "messaging",
+    "notifications",
+    "chatpush"
+  ],
+  "license": "MIT",
+  "privacy_policies": [
+    "https://github.com/ChatPush/mcp-chatpush/blob/main/PRIVACY.md",
+    "https://chatpush.ru/jp/privacypolicy"
+  ],
+  "compatibility": {
+    "platforms": [
+      "darwin",
+      "win32",
+      "linux"
+    ],
+    "runtimes": {
+      "node": ">=18.17.0"
+    }
+  },
+  "user_config": {
+    "chatpush_token": {
+      "type": "string",
+      "title": "ChatPush token",
+      "description": "Bearer token from your ChatPush dashboard (https://chatpush.ru)",
+      "sensitive": true,
+      "required": true
+    },
+    "chatpush_base_url": {
+      "type": "string",
+      "title": "API base URL",
+      "description": "Leave the default unless you use a white-label ChatPush installation",
+      "required": false,
+      "default": "https://api.chatpush.ru"
+    }
+  }
+}

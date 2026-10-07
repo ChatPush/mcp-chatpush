@@ -1,0 +1,84 @@
+# Push a tag like v1.0.1 (matching package.json) to publish:
+#   1. npm package (trusted publishing, provenance — no npm token or OTP needed)
+#   2. GitHub release with the Claude Desktop extension (.mcpb)
+#   3. Official MCP Registry entry (GitHub OIDC)
+# Each step skips work that is already done, so a failed run can simply be re-run.
+name: Release
+
+on:
+  push:
+    tags: ["v*"]
+
+permissions:
+  contents: write # create the GitHub release
+  id-token: write # npm trusted publishing and MCP Registry login
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 24
+          registry-url: https://registry.npmjs.org
+
+      # Trusted publishing needs npm 11.5.1 or newer.
+      - run: npm install -g npm@latest
+
+      - run: npm ci
+
+      - name: Check tag matches package.json
+        run: |
+          VERSION="$(node -p "require('./package.json').version")"
+          if [ "${GITHUB_REF_NAME#v}" != "$VERSION" ]; then
+            echo "Tag $GITHUB_REF_NAME does not match package.json version $VERSION"
+            exit 1
+          fi
+          echo "VERSION=$VERSION" >> "$GITHUB_ENV"
+
+      - run: npm run build
+
+      - name: Check versions and tools
+        run: npm run check
+
+      - name: Publish to npm
+        run: |
+          if npm view "chatpush-mcp-server@$VERSION" version >/dev/null 2>&1; then
+            echo "chatpush-mcp-server@$VERSION is already on npm, skipping"
+          else
+            npm publish --access public
+          fi
+
+      - name: Build Claude Desktop extension
+        run: npm run build:mcpb
+
+      - name: Create GitHub release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          awk -v v="## $VERSION" 'index($0, v) == 1 {f = 1; next} /^## / {f = 0} f' CHANGELOG.md > release-notes.md
+          if gh release view "$GITHUB_REF_NAME" >/dev/null 2>&1; then
+            gh release upload "$GITHUB_REF_NAME" build/chatpush-mcp-server.mcpb --clobber
+          else
+            gh release create "$GITHUB_REF_NAME" build/chatpush-mcp-server.mcpb --title "$GITHUB_REF_NAME" --notes-file release-notes.md
+          fi
+
+      - name: Add the .mcpb bundle to server.json
+        run: |
+          SHA256="$(sha256sum build/chatpush-mcp-server.mcpb | cut -d' ' -f1)"
+          URL="https://github.com/${GITHUB_REPOSITORY}/releases/download/${GITHUB_REF_NAME}/chatpush-mcp-server.mcpb"
+          jq --arg url "$URL" --arg sha "$SHA256" \
+            '.packages += [{"registryType": "mcpb", "identifier": $url, "fileSha256": $sha, "transport": {"type": "stdio"}}]' \
+            server.json > server.tmp && mv server.tmp server.json
+
+      - name: Install mcp-publisher
+        run: |
+          curl -fsSL "https://github.com/modelcontextprotocol/registry/releases/latest/download/mcp-publisher_$(uname -s | tr '[:upper:]' '[:lower:]')_$(uname -m | sed 's/x86_64/amd64/;s/aarch64/arm64/').tar.gz" | tar xz mcp-publisher
+
+      - name: Publish to MCP Registry
+        run: |
+          ./mcp-publisher validate
+          ./mcp-publisher login github-oidc
+          ./mcp-publisher publish

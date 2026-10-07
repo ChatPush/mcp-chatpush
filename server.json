@@ -1,0 +1,51 @@
+{
+  "$schema": "https://static.modelcontextprotocol.io/schemas/2025-12-11/server.schema.json",
+  "name": "io.github.ChatPush/mcp-chatpush",
+  "title": "ChatPush",
+  "description": "Send WhatsApp, Telegram, SMS and MAX messages, files and bulk mailings via ChatPush",
+  "websiteUrl": "https://chatpush.ru",
+  "repository": {
+    "url": "https://github.com/ChatPush/mcp-chatpush",
+    "source": "github"
+  },
+  "version": "1.0.0",
+  "packages": [
+    {
+      "registryType": "npm",
+      "registryBaseUrl": "https://registry.npmjs.org",
+      "identifier": "chatpush-mcp-server",
+      "version": "1.0.0",
+      "transport": {
+        "type": "stdio"
+      },
+      "environmentVariables": [
+        {
+          "name": "CHATPUSH_TOKEN",
+          "description": "Bearer token from the ChatPush dashboard (https://chatpush.ru)",
+          "isRequired": true,
+          "isSecret": true
+        },
+        {
+          "name": "CHATPUSH_BASE_URL",
+          "description": "API host. Change only for a white-label ChatPush installation.",
+          "isRequired": false,
+          "default": "https://api.chatpush.ru"
+        }
+      ]
+    }
+  ],
+  "remotes": [
+    {
+      "type": "streamable-http",
+      "url": "https://mcp.chatpush.ru/mcp",
+      "headers": [
+        {
+          "name": "Authorization",
+          "description": "Bearer <ChatPush API token from the dashboard>",
+          "isRequired": true,
+          "isSecret": true
+        }
+      ]
+    }
+  ]
+}
