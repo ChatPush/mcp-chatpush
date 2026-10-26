@@ -41,7 +41,7 @@ const sendBulk = defineTool({
     "Use it for announcements, campaigns or reminders to a list of recipients. For one recipient, or when a delivery ID is needed for tracking, use send_message.",
   ].join("\n\n"),
   inputSchema: {
-    text: z.string().min(1).describe("Message text."),
+    text: z.string().min(1).describe("Message text. Max 3500 chars; 938 when dispatch_routing (or the account default routing) includes SMS. One SMS segment is 160 Latin characters."),
     phones_numbers: z
       .array(phoneSchema)
       .min(1)

@@ -19,9 +19,13 @@ export interface RequestOptions<S extends z.ZodType> {
   method: HttpMethod
   /** Path relative to CHATPUSH_BASE_URL, e.g. `/api/v1/delivery`. */
   path: string
-  /** ChatPush takes parameters in the URL query string, for POST requests too. */
+  /**
+   * Request parameters. GET and DELETE send them in the URL query string; POST, PUT and PATCH in the
+   * body (form-urlencoded, or added to `form`), so message text and phone numbers stay out of URLs
+   * and access logs, and long texts don't hit the URL length limit (HTTP 414).
+   */
   query?: Query
-  /** multipart/form-data body (send_file). */
+  /** multipart/form-data body (send_file); `query` fields are added to it. */
   form?: FormData
   /** Expected response body. Validated with zod; a mismatch is reported as an error. */
   schema: S
@@ -45,7 +49,18 @@ export class ChatPushClient {
     const token = this.token ?? this.config.token
     if (!token) throw new ConfigError(missingTokenMessage(this.config.mode))
 
-    const url = this.buildUrl(path, options.query)
+    const inBody = method === "POST" || method === "PUT" || method === "PATCH"
+    const params = toParams(options.query)
+    const url = new URL(`${this.config.baseUrl}${path}`)
+    let body: FormData | URLSearchParams | undefined
+    if (!inBody) {
+      for (const [key, value] of params) url.searchParams.append(key, value)
+    } else if (options.form) {
+      body = options.form
+      for (const [key, value] of params) body.append(key, value)
+    } else {
+      body = new URLSearchParams(params)
+    }
     const headers = {
       Accept: "application/json",
       Authorization: `Bearer ${token}`,
@@ -63,7 +78,7 @@ export class ChatPushClient {
         response = await fetch(url, {
           method,
           headers,
-          body: options.form,
+          body,
           signal: AbortSignal.timeout(this.config.timeoutMs),
         })
       } catch (err) {
@@ -130,20 +145,6 @@ export class ChatPushClient {
     }
   }
 
-  private buildUrl(path: string, query: Query | undefined): string {
-    const url = new URL(`${this.config.baseUrl}${path}`)
-    for (const [key, value] of Object.entries(query ?? {})) {
-      if (value === undefined || value === null) continue
-      if (Array.isArray(value)) {
-        // Rails-style arrays, as in the docs: dispatch_routing[]=whatsapp&dispatch_routing[]=sms
-        for (const item of value) url.searchParams.append(`${key}[]`, String(item))
-      } else {
-        url.searchParams.append(key, String(value))
-      }
-    }
-    return url.toString()
-  }
-
   private networkError(err: unknown, method: HttpMethod, path: string, nonIdempotent: boolean): ApiErrorResult {
     const timedOut = err instanceof Error && err.name === "TimeoutError"
     let message: string
@@ -165,6 +166,17 @@ export class ChatPushClient {
 export function unwrap<T>(result: ApiResult<T>): T {
   if (result.error) throw new ChatPushRequestError(result)
   return result.data
+}
+
+/** Rails-style arrays, as in the docs: dispatch_routing[]=whatsapp&dispatch_routing[]=sms */
+function toParams(query: Query | undefined): [string, string][] {
+  const params: [string, string][] = []
+  for (const [key, value] of Object.entries(query ?? {})) {
+    if (value === undefined || value === null) continue
+    if (Array.isArray(value)) for (const item of value) params.push([`${key}[]`, String(item)])
+    else params.push([key, String(value)])
+  }
+  return params
 }
 
 function extractFailure(response: Response, payload: unknown): ApiErrorResult | undefined {

@@ -79,7 +79,7 @@ Put TLS in front (nginx, Traefik, a cloud load balancer) and point `mcp.chatpush
 | `CHATPUSH_MAX_BODY_MB` | `20` | Largest request body, in MB. Bigger requests get 413 before they are read |
 | `CHATPUSH_MAX_CONCURRENT_REQUESTS` | `32` | MCP requests handled at once; the rest get 503 with `Retry-After` |
 | `CHATPUSH_ALLOWED_ORIGIN` | `*` | Value for `Access-Control-Allow-Origin` |
-| `CHATPUSH_DEBUG` | `0` | `1` logs every request URL to stderr. URLs contain message text and phone numbers, so keep it off in production |
+| `CHATPUSH_DEBUG` | `0` | `1` logs every request (method and URL) to stderr. Read requests carry IDs and phone numbers in the URL, so keep it off in production |
 
 ## Local mode (stdio)
 
@@ -159,7 +159,7 @@ Add the same `mcpServers` block to `~/.cursor/mcp.json`.
 
 ## Behaviour
 
-- Parameters go in the URL query string, as the ChatPush API expects; `send_file` uploads the file as `multipart/form-data`.
+- GET and DELETE send parameters in the URL query string. POST, PUT and PATCH send them in the request body (`send_file` as `multipart/form-data`), so message text and phone numbers stay out of URLs and long texts don't hit the URL length limit.
 - Incompatible parameters (a Telegram `username` without the `tdlib` channel, `scheduled_at` in the past) are rejected before any request is sent.
 - HTTP 429 is retried up to 3 times with exponential backoff, honouring `Retry-After`; 5xx twice — except for requests that send messages, so nothing is sent twice.
 - Requests time out after 30 seconds.

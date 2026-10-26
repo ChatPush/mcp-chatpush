@@ -90,3 +90,44 @@ describe("ChatPushClient", () => {
     await assert.rejects(new ChatPushClient(config).request({ method: "GET", path: "/x", schema }), /Authorization: Bearer/)
   })
 })
+
+describe("where parameters go", () => {
+  test("POST sends them in the body, not the URL", async () => {
+    let seen: { url: string; body: string } | undefined
+    restore = mockFetch(async (url, init) => {
+      seen = { url, body: String(init?.body) }
+      return json({ ok: true })
+    }).restore
+    await new ChatPushClient(testConfig()).request({
+      method: "POST",
+      path: "/api/v1/delivery",
+      query: { phone: "79990000000", text: "привет", dispatch_routing: ["max", "sms"], skip: undefined },
+      schema,
+    })
+    assert.equal(seen?.url, "https://api.chatpush.test/api/v1/delivery")
+    const body = new URLSearchParams(seen?.body)
+    assert.equal(body.get("text"), "привет")
+    assert.deepEqual(body.getAll("dispatch_routing[]"), ["max", "sms"])
+    assert.equal(body.has("skip"), false)
+  })
+
+  test("multipart requests get the fields added to the form", async () => {
+    let form: FormData | undefined
+    restore = mockFetch(async (_, init) => {
+      form = init?.body as FormData
+      return json({ ok: true })
+    }).restore
+    const upload = new FormData()
+    upload.append("file", new Blob(["x"]), "a.pdf")
+    await new ChatPushClient(testConfig()).request({ method: "POST", path: "/f", query: { phone: "7999" }, form: upload, schema })
+    assert.equal(form?.get("phone"), "7999")
+    assert.ok(form?.get("file"))
+  })
+
+  test("GET keeps them in the query string", async () => {
+    const mock = mockFetch(() => json({ ok: true }))
+    restore = mock.restore
+    await new ChatPushClient(testConfig()).request({ method: "GET", path: "/x", query: { id: 5 }, schema })
+    assert.equal(mock.calls[0], "https://api.chatpush.test/x?id=5")
+  })
+})

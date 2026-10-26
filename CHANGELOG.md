@@ -10,4 +10,6 @@
 - `file_url` downloads stop at 100 MB instead of buffering the whole body; base64 size is checked before decoding.
 - Error messages name the right place for the token in each mode.
 - A Retry-After longer than 15 s is reported instead of waited for, so tool calls don't outlive client timeouts.
+- POST, PUT and PATCH send parameters in the request body instead of the URL: a 3500-character Cyrillic text made a 21 KB URL that ChatPush answered with HTTP 414 (the limit was about 1350 Cyrillic characters), and texts and phone numbers no longer land in access logs.
+- `send_message` / `send_bulk` describe the 938-character text limit when the routing includes SMS.
 - Unit tests (`npm test`), run in CI.
