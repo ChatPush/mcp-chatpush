@@ -1,6 +1,7 @@
 import { createRequire } from "node:module"
 import dotenv from "dotenv"
 import { ConfigError } from "./errors.js"
+import type { ServerMode } from "./types.js"
 
 // dotenv 17 announces itself on stdout unless told to be quiet, and stdout carries the MCP protocol.
 dotenv.config({ quiet: true })
@@ -15,13 +16,15 @@ const DEFAULT_BASE_URL = "https://api.chatpush.ru"
 const REQUEST_TIMEOUT_MS = 30_000
 
 export interface Config {
+  /** Where the server runs: decides which tool parameters are safe and how errors are worded. */
+  mode: ServerMode
   /** Bearer token from the ChatPush dashboard. Checked per request so the server can start without it. */
   token?: string
   baseUrl: string
   timeoutMs: number
 }
 
-export function loadConfig(): Config {
+export function loadConfig(mode: ServerMode): Config {
   const baseUrl = process.env.CHATPUSH_BASE_URL?.trim() || DEFAULT_BASE_URL
   let url: URL
   try {
@@ -34,6 +37,7 @@ export function loadConfig(): Config {
   }
 
   return {
+    mode,
     token: process.env.CHATPUSH_TOKEN?.trim() || undefined,
     baseUrl: baseUrl.replace(/\/+$/, ""),
     timeoutMs: REQUEST_TIMEOUT_MS,

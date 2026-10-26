@@ -21,7 +21,7 @@ It runs in two modes from the same codebase:
 | `get_utm_tags` | UTM tags used to track dispatches |
 | `send_message` | Send a text via WhatsApp, Telegram (tdlib), Telegram Bot, SMS, VK/OK or MAX — with cascade, scheduling, priority and reply-to |
 | `send_bulk` | Send the same message to many phone numbers at once |
-| `send_file` | Send a document, image, audio or video from a local path, URL or base64 (up to 100 MB) |
+| `send_file` | Send a document, image, audio or video from a local path, URL or base64 (up to 100 MB; base64 only on the hosted server) |
 | `get_delivery_status` | Status and details of a delivery, explained in plain words |
 | `delete_delivery` | Delete a delivered WhatsApp/Telegram message on all recipient devices |
 | `get_phone_info` | Country, operator and normalized format of a phone number |
@@ -47,6 +47,7 @@ Authorization: Bearer <ChatPush API token>
 - **Stateless:** a fresh server instance per request, so it scales horizontally behind any proxy.
 - **No credentials on the server:** the token is read from the request header and used only for that request. Nothing is stored or logged.
 - `GET /healthz` returns `{"status":"ok",...}` without a token, for load-balancer checks.
+- **Files:** `send_file` takes only `file_base64` here. `file_path` and `file_url` are local-mode only: on a shared server they would point at the server's own disk and network. With the default 20 MB request limit, files up to about 14 MB fit.
 
 Connecting from a client that supports remote MCP servers:
 
@@ -74,9 +75,11 @@ Put TLS in front (nginx, Traefik, a cloud load balancer) and point `mcp.chatpush
 | `HOST` | `0.0.0.0` | Interface to bind |
 | `CHATPUSH_MCP_PATH` | `/mcp` | Path of the MCP endpoint |
 | `CHATPUSH_BASE_URL` | `https://api.chatpush.ru` | ChatPush API host |
-| `CHATPUSH_ALLOWED_HOSTS` | — | Comma-separated `Host` values to accept, e.g. `mcp.chatpush.ru`. Set it in production: it blocks DNS-rebinding attacks |
+| `CHATPUSH_ALLOWED_HOSTS` | — | Comma-separated hostnames accepted in the `Host` header of `/mcp` requests (port ignored), e.g. `mcp.chatpush.ru`. **Required in production:** it blocks DNS-rebinding attacks. Empty = any host, with a warning at startup |
+| `CHATPUSH_MAX_BODY_MB` | `20` | Largest request body, in MB. Bigger requests get 413 before they are read |
+| `CHATPUSH_MAX_CONCURRENT_REQUESTS` | `32` | MCP requests handled at once; the rest get 503 with `Retry-After` |
 | `CHATPUSH_ALLOWED_ORIGIN` | `*` | Value for `Access-Control-Allow-Origin` |
-| `CHATPUSH_DEBUG` | `0` | `1` logs every request to stderr |
+| `CHATPUSH_DEBUG` | `0` | `1` logs every request URL to stderr. URLs contain message text and phone numbers, so keep it off in production |
 
 ## Local mode (stdio)
 
@@ -171,10 +174,13 @@ cp .env.example .env     # put your token in .env
 npm run build
 npm run dev              # stdio
 npm run dev:http         # remote, http://localhost:3000/mcp
+npm test                 # unit tests
 ```
 
 | Script | What it does |
 | --- | --- |
+| `npm test` | Unit tests (`node:test`): validation, retries, double-send protection, hosted-server limits |
+| `npm run typecheck` | Type-check the sources and the tests |
 | `npm run check` | Versions in sync across `package.json` / `server.json` / `manifest.json` and all 19 tools exposed |
 | `npm run build:mcpb` | Build the Claude Desktop extension into `build/chatpush-mcp-server.mcpb` |
 | `npm run inspector` | Open the MCP Inspector against the local server |
