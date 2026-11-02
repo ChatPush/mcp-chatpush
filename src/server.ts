@@ -31,8 +31,8 @@ export const tools: AnyToolDefinition[] = [
 ]
 
 /**
- * One server instance per connection. In remote mode `token` comes from the caller's
- * Authorization header, so nothing is shared between users.
+ * One server instance per connection. In remote mode (`config.mode` "http") `token` comes from the
+ * caller's Authorization header, so nothing is shared between users.
  */
 export function createMcpServer(config: Config, token?: string): McpServer {
   const server = new McpServer({ name: SERVER_NAME, version: SERVER_VERSION }, { instructions: INSTRUCTIONS })

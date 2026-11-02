@@ -5,7 +5,7 @@ import { z } from "zod"
 import { unwrap } from "../client.js"
 import { InputValidationError, NetworkError } from "../errors.js"
 import { formatBytes } from "../format.js"
-import { deliveryResponseSchema } from "../types.js"
+import { deliveryResponseSchema, type ServerMode } from "../types.js"
 import {
   assertRecipient,
   assertScheduledAt,
@@ -69,19 +69,38 @@ interface LoadedFile {
   detectedMimeType?: string
 }
 
-async function loadFile(args: { file_path?: string; file_url?: string; file_base64?: string }): Promise<LoadedFile> {
+const REMOTE_SOURCE_MESSAGE =
+  "file_path and file_url are not available on the hosted ChatPush MCP server: it can't see your files and doesn't download URLs. " +
+  "Pass the file content as file_base64 together with file_name (e.g. document.pdf)."
+
+async function loadFile(
+  args: { file_path?: string; file_url?: string; file_base64?: string },
+  mode: ServerMode,
+): Promise<LoadedFile> {
+  // On the hosted server a path would point at the server's own disk and a URL into its network.
+  if (mode === "http" && (args.file_path !== undefined || args.file_url !== undefined)) {
+    throw new InputValidationError(REMOTE_SOURCE_MESSAGE)
+  }
+
   const sources = [args.file_path, args.file_url, args.file_base64].filter((source) => source !== undefined)
   if (sources.length !== 1) {
-    throw new InputValidationError("Provide exactly one file source: file_path, file_url or file_base64.")
+    throw new InputValidationError(
+      mode === "http"
+        ? "Provide the file as file_base64 (with file_name)."
+        : "Provide exactly one file source: file_path, file_url or file_base64.",
+    )
   }
 
   if (args.file_path !== undefined) {
     const path = resolve(args.file_path.replace(/^~(?=$|[/\\])/, homedir()))
     const info = await stat(path).catch(() => undefined)
-    if (!info) throw new InputValidationError(`File not found or not readable: ${path}`)
-    if (!info.isFile()) throw new InputValidationError(`Not a regular file: ${path}`)
+    if (!info) throw new InputValidationError(`File not found or not readable: ${args.file_path}`)
+    if (!info.isFile()) throw new InputValidationError(`Not a regular file: ${args.file_path}`)
     assertFileSize(info.size)
-    return { bytes: await readFile(path), fileName: basename(path) }
+    const bytes = await readFile(path)
+    // stat() reports 0 for some special files; check what was actually read.
+    assertFileSize(bytes.byteLength)
+    return { bytes, fileName: basename(path) }
   }
 
   if (args.file_url !== undefined) {
@@ -91,11 +110,20 @@ async function loadFile(args: { file_path?: string; file_url?: string; file_base
     } catch (err) {
       throw new NetworkError(`Could not download file_url: ${err instanceof Error ? err.message : String(err)}`)
     }
-    if (!response.ok) throw new NetworkError(`Could not download file_url: HTTP ${response.status} ${response.statusText}`)
+    if (!response.ok) {
+      await response.body?.cancel()
+      throw new NetworkError(`Could not download file_url: HTTP ${response.status} ${response.statusText}`)
+    }
     const declaredSize = Number(response.headers.get("content-length"))
-    if (declaredSize) assertFileSize(declaredSize)
-    const bytes = new Uint8Array(await response.arrayBuffer())
-    assertFileSize(bytes.byteLength)
+    if (declaredSize) {
+      try {
+        assertFileSize(declaredSize)
+      } catch (err) {
+        await response.body?.cancel()
+        throw err
+      }
+    }
+    const bytes = await readLimited(response.body, MAX_FILE_BYTES)
     return {
       bytes,
       fileName: decodeURIComponent(basename(new URL(response.url || args.file_url).pathname)) || undefined,
@@ -105,10 +133,46 @@ async function loadFile(args: { file_path?: string; file_url?: string; file_base
 
   const raw = args.file_base64 ?? ""
   const dataUrl = /^data:([^;,]+)?(?:;base64)?,/.exec(raw)
-  const bytes = Buffer.from(dataUrl ? raw.slice(dataUrl[0].length) : raw, "base64")
+  const encoded = dataUrl ? raw.slice(dataUrl[0].length) : raw
+  // Check the decoded size before decoding: base64 is 4 characters per 3 bytes.
+  assertFileSize(Math.floor((encoded.length * 3) / 4))
+  const bytes = Buffer.from(encoded, "base64")
   if (bytes.byteLength === 0) throw new InputValidationError("file_base64 is empty or not valid base64.")
   assertFileSize(bytes.byteLength)
   return { bytes, detectedMimeType: dataUrl?.[1] }
+}
+
+/**
+ * Reads a response body, stopping as soon as it grows past `limit` bytes. Content-Length can be
+ * missing or describe the compressed size, so the bytes themselves are counted.
+ */
+export async function readLimited(body: ReadableStream<Uint8Array> | null, limit: number): Promise<Uint8Array> {
+  if (!body) return new Uint8Array()
+  const reader = body.getReader()
+  const chunks: Uint8Array[] = []
+  let total = 0
+  try {
+    for (;;) {
+      const { done, value } = await reader.read()
+      if (done) break
+      total += value.byteLength
+      if (total > limit) {
+        await reader.cancel()
+        throw new InputValidationError(`The file is larger than ${formatBytes(limit)}; ChatPush accepts files up to 100 MB.`)
+      }
+      chunks.push(value)
+    }
+  } catch (err) {
+    if (err instanceof InputValidationError) throw err
+    throw new NetworkError(`Could not download file_url: ${err instanceof Error ? err.message : String(err)}`)
+  }
+  const bytes = new Uint8Array(total)
+  let offset = 0
+  for (const chunk of chunks) {
+    bytes.set(chunk, offset)
+    offset += chunk.byteLength
+  }
+  return bytes
 }
 
 function assertFileSize(bytes: number): void {
@@ -138,14 +202,27 @@ function resolveNameAndMime(file: LoadedFile, fileNameArg: string | undefined): 
   return { fileName, mimeType }
 }
 
+const SUPPORTED_FORMATS_TEXT =
+  "Supported: pdf, doc, docx, ppt, pptx, xls, xlsx, zip, 7z; ogg, opus, mp3, aac, amr, 3gp; jpeg, png, webp; mp4; vcf."
+const RECIPIENT_TEXT =
+  'Recipient: `phone`, or for personal Telegram (dispatch_routing ["tdlib"]) `username` or `tdlib_user_id` instead.'
+
 const sendFile = defineTool({
   name: "send_file",
   title: "Send file",
   description: [
     "Send a file (document, image, audio, video, contact) to a recipient via WhatsApp or Telegram. File is uploaded as multipart/form-data. Images under 10MB sent natively, larger files as download links active for 7 days.",
     "Use it when the user wants to share a document, photo, voice message, video or contact card. Provide the file as exactly one of: file_path (local file), file_url (downloaded by the server) or file_base64 (with file_name).",
-    "Supported: pdf, doc, docx, ppt, pptx, xls, xlsx, zip, 7z; ogg, opus, mp3, aac, amr, 3gp; jpeg, png, webp; mp4; vcf. Max 100 MB. Recipient rules are the same as send_message.",
+    `${SUPPORTED_FORMATS_TEXT} Max 100 MB. ${RECIPIENT_TEXT}`,
   ].join("\n\n"),
+  remote: {
+    omitParams: ["file_path", "file_url"],
+    description: [
+      "Send a file (document, image, audio, video, contact) to a recipient via WhatsApp or Telegram. Images under 10MB sent natively, larger files as download links active for 7 days.",
+      "Use it when the user wants to share a document, photo, voice message, video or contact card. Pass the file content as file_base64 together with file_name (with the extension). This hosted server can't read local files or download URLs.",
+      `${SUPPORTED_FORMATS_TEXT} ${RECIPIENT_TEXT}`,
+    ].join("\n\n"),
+  },
   inputSchema: {
     file_path: z.string().min(1).optional().describe("Absolute path of a local file to upload (~ is expanded)."),
     file_url: z.url({ protocol: /^https?$/ }).optional().describe("Public http(s) URL of the file; the server downloads and uploads it."),
@@ -175,11 +252,11 @@ const sendFile = defineTool({
     simulate_typing: simulateTypingSchema.optional(),
   },
   annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: false, openWorldHint: true },
-  async handler(args, { client }) {
+  async handler(args, { client, config }) {
     assertRecipient(args)
     assertScheduledAt(args.scheduled_at)
 
-    const file = await loadFile(args)
+    const file = await loadFile(args, config.mode)
     const { fileName, mimeType } = resolveNameAndMime(file, args.file_name)
     if (args.type === "image" && !mimeType.startsWith("image/")) {
       throw new InputValidationError(`type "image" only works for JPEG, PNG or WebP files, not ${mimeType}. Use "document" or omit type.`)

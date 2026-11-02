@@ -60,7 +60,7 @@ const sendMessage = defineTool({
     text: z
       .string()
       .min(1)
-      .describe("Message text. Max 3500 chars for messengers, 160 for one SMS segment in Latin characters."),
+      .describe("Message text. Max 3500 chars; 938 when dispatch_routing (or the account default routing) includes SMS. One SMS segment is 160 Latin characters."),
     sender_name: senderNameSchema.optional(),
     utm_mark: utmMarkSchema.optional(),
     callback_url: callbackUrlSchema.optional(),

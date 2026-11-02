@@ -1,14 +1,17 @@
 import { z } from "zod"
 import { SERVER_NAME, SERVER_VERSION, type Config } from "./config.js"
-import { ConfigError, ChatPushRequestError, MISSING_TOKEN_MESSAGE, RATE_LIMIT_MESSAGE } from "./errors.js"
-import { isRecord, truncate } from "./format.js"
+import { AcceptedResponseError, ConfigError, ChatPushRequestError, RATE_LIMIT_MESSAGE, missingTokenMessage } from "./errors.js"
+import { isRecord, redactSecrets, truncate } from "./format.js"
 import { log } from "./logger.js"
 import type { ApiErrorResult, ApiResult, HttpMethod, Query } from "./types.js"
 
 const MAX_RATE_LIMIT_RETRIES = 3
 const RATE_LIMIT_BASE_DELAY_MS = 1_000
-/** A Retry-After longer than this is reported to the user instead of silently blocking the tool call. */
-const MAX_RETRY_AFTER_MS = 60_000
+/**
+ * A Retry-After longer than this is reported to the user instead of silently blocking the tool call.
+ * Kept short: many MCP clients give up on a tool call after about a minute.
+ */
+const MAX_RETRY_AFTER_MS = 15_000
 const MAX_SERVER_ERROR_RETRIES = 2
 const SERVER_ERROR_RETRY_DELAY_MS = 1_000
 
@@ -16,15 +19,20 @@ export interface RequestOptions<S extends z.ZodType> {
   method: HttpMethod
   /** Path relative to CHATPUSH_BASE_URL, e.g. `/api/v1/delivery`. */
   path: string
-  /** ChatPush takes parameters in the URL query string, for POST requests too. */
+  /**
+   * Request parameters. GET and DELETE send them in the URL query string; POST, PUT and PATCH in the
+   * body (form-urlencoded, or added to `form`), so message text and phone numbers stay out of URLs
+   * and access logs, and long texts don't hit the URL length limit (HTTP 414).
+   */
   query?: Query
-  /** multipart/form-data body (send_file). */
+  /** multipart/form-data body (send_file); `query` fields are added to it. */
   form?: FormData
   /** Expected response body. Validated with zod; a mismatch is reported as an error. */
   schema: S
   /**
-   * Retry 5xx responses (default true). Disabled for calls that send messages: the server may have
-   * sent the message before failing, and a retry would send it twice.
+   * Retry 5xx responses (default true). Disabled for calls that send or create something: the server
+   * may have done it before failing, and a retry would do it twice. Such calls are also never reported
+   * as "not sent" unless ChatPush certainly did not receive them.
    */
   retryServerErrors?: boolean
 }
@@ -39,15 +47,27 @@ export class ChatPushClient {
   async request<S extends z.ZodType>(options: RequestOptions<S>): Promise<ApiResult<z.infer<S>>> {
     const { method, path } = options
     const token = this.token ?? this.config.token
-    if (!token) throw new ConfigError(MISSING_TOKEN_MESSAGE)
+    if (!token) throw new ConfigError(missingTokenMessage(this.config.mode))
 
-    const url = this.buildUrl(path, options.query)
+    const inBody = method === "POST" || method === "PUT" || method === "PATCH"
+    const params = toParams(options.query)
+    const url = new URL(`${this.config.baseUrl}${path}`)
+    let body: FormData | URLSearchParams | undefined
+    if (!inBody) {
+      for (const [key, value] of params) url.searchParams.append(key, value)
+    } else if (options.form) {
+      body = options.form
+      for (const [key, value] of params) body.append(key, value)
+    } else {
+      body = new URLSearchParams(params)
+    }
     const headers = {
       Accept: "application/json",
       Authorization: `Bearer ${token}`,
       "User-Agent": `${SERVER_NAME}/${SERVER_VERSION}`,
     }
     const retryServerErrors = options.retryServerErrors ?? true
+    const nonIdempotent = !retryServerErrors
     let rateLimitRetries = 0
     let serverErrorRetries = 0
 
@@ -58,11 +78,11 @@ export class ChatPushClient {
         response = await fetch(url, {
           method,
           headers,
-          body: options.form,
+          body,
           signal: AbortSignal.timeout(this.config.timeoutMs),
         })
       } catch (err) {
-        return this.networkError(err, method, path)
+        return this.networkError(err, method, path, nonIdempotent)
       }
 
       if (response.status === 429 && rateLimitRetries < MAX_RATE_LIMIT_RETRIES) {
@@ -86,7 +106,18 @@ export class ChatPushClient {
         continue
       }
 
-      const payload = await readPayload(response)
+      let payload: unknown
+      try {
+        payload = await readPayload(response)
+      } catch (err) {
+        if (response.ok && nonIdempotent) {
+          throw new AcceptedResponseError(
+            `ChatPush accepted the request (HTTP ${response.status}), but the connection broke while reading its response (${describeCause(err)}). ` +
+              "It has most likely been done — do NOT repeat it. Check the result first (get_delivery_status, list_webhooks, list_sub_customers or the ChatPush dashboard).",
+          )
+        }
+        return this.networkError(err, method, path, nonIdempotent)
+      }
       const failure = extractFailure(response, payload)
       if (failure) {
         log.warn(`${method} ${path} failed: HTTP ${failure.code} ${failure.message}`)
@@ -96,36 +127,36 @@ export class ChatPushClient {
       const parsed = options.schema.safeParse(payload)
       if (!parsed.success) {
         log.warn(`Unexpected response shape for ${method} ${path}: ${z.prettifyError(parsed.error)}`)
+        const raw = truncate(JSON.stringify(redactSecrets(payload)), 1500)
+        if (nonIdempotent) {
+          throw new AcceptedResponseError(
+            `ChatPush accepted the request (HTTP ${response.status}), but its response is in an unexpected format, so the details can't be shown. ` +
+              `Do NOT repeat the request — it has been done. Raw response: ${raw}`,
+          )
+        }
         return {
           error: true,
           code: response.status,
-          message: `ChatPush returned a response in an unexpected format. Raw response: ${truncate(JSON.stringify(payload), 1500)}`,
-          details: payload,
+          message: `ChatPush returned a response in an unexpected format. Raw response: ${raw}`,
+          details: redactSecrets(payload),
         }
       }
       return { error: false, status: response.status, data: parsed.data }
     }
   }
 
-  private buildUrl(path: string, query: Query | undefined): string {
-    const url = new URL(`${this.config.baseUrl}${path}`)
-    for (const [key, value] of Object.entries(query ?? {})) {
-      if (value === undefined || value === null) continue
-      if (Array.isArray(value)) {
-        // Rails-style arrays, as in the docs: dispatch_routing[]=whatsapp&dispatch_routing[]=sms
-        for (const item of value) url.searchParams.append(`${key}[]`, String(item))
-      } else {
-        url.searchParams.append(key, String(value))
-      }
-    }
-    return url.toString()
-  }
-
-  private networkError(err: unknown, method: HttpMethod, path: string): ApiErrorResult {
+  private networkError(err: unknown, method: HttpMethod, path: string, nonIdempotent: boolean): ApiErrorResult {
     const timedOut = err instanceof Error && err.name === "TimeoutError"
-    const message = timedOut
-      ? `ChatPush did not respond within ${this.config.timeoutMs / 1000} seconds. The request may still have been processed — check before repeating it.`
-      : `Could not reach ChatPush at ${this.config.baseUrl}: ${describeCause(err)}. Check your network connection and CHATPUSH_BASE_URL.`
+    let message: string
+    if (timedOut) {
+      message = `ChatPush did not respond within ${this.config.timeoutMs / 1000} seconds. The request may still have been processed — check before repeating it.`
+    } else if (nonIdempotent && !neverReachedServer(err)) {
+      message =
+        `The connection to ChatPush broke (${describeCause(err)}) after the request was sent. ChatPush may have accepted it — do NOT repeat it blindly. ` +
+        "Check first (get_delivery_status, list_webhooks, list_sub_customers or the ChatPush dashboard)."
+    } else {
+      message = `Could not reach ChatPush at ${this.config.baseUrl}: ${describeCause(err)}. Check your network connection${this.config.mode === "stdio" ? " and CHATPUSH_BASE_URL" : ""}.`
+    }
     log.warn(`${method} ${path}: ${message}`)
     return { error: true, code: 0, message }
   }
@@ -135,6 +166,17 @@ export class ChatPushClient {
 export function unwrap<T>(result: ApiResult<T>): T {
   if (result.error) throw new ChatPushRequestError(result)
   return result.data
+}
+
+/** Rails-style arrays, as in the docs: dispatch_routing[]=whatsapp&dispatch_routing[]=sms */
+function toParams(query: Query | undefined): [string, string][] {
+  const params: [string, string][] = []
+  for (const [key, value] of Object.entries(query ?? {})) {
+    if (value === undefined || value === null) continue
+    if (Array.isArray(value)) for (const item of value) params.push([`${key}[]`, String(item)])
+    else params.push([key, String(value)])
+  }
+  return params
 }
 
 function extractFailure(response: Response, payload: unknown): ApiErrorResult | undefined {
@@ -151,7 +193,7 @@ function extractFailure(response: Response, payload: unknown): ApiErrorResult | 
       : typeof payload === "string" && payload.trim()
         ? truncate(payload.trim(), 300)
         : response.statusText || "Request failed"
-  return { error: true, code, message, details: meta ? meta.errors : payload }
+  return { error: true, code, message, details: redactSecrets(meta ? meta.errors : payload) }
 }
 
 async function readPayload(response: Response): Promise<unknown> {
@@ -170,6 +212,26 @@ function retryAfterMs(header: string | null): number | undefined {
   if (Number.isFinite(seconds)) return Math.max(0, seconds * 1000)
   const date = Date.parse(header)
   return Number.isNaN(date) ? undefined : Math.max(0, date - Date.now())
+}
+
+/** Errors raised before the request left this machine: ChatPush certainly did not receive it. */
+const NOT_SENT_CODES = new Set([
+  "ECONNREFUSED",
+  "ENOTFOUND",
+  "EAI_AGAIN",
+  "EHOSTUNREACH",
+  "ENETUNREACH",
+  "UND_ERR_CONNECT_TIMEOUT",
+  "CERT_HAS_EXPIRED",
+  "DEPTH_ZERO_SELF_SIGNED_CERT",
+  "SELF_SIGNED_CERT_IN_CHAIN",
+  "UNABLE_TO_VERIFY_LEAF_SIGNATURE",
+  "ERR_TLS_CERT_ALTNAME_INVALID",
+])
+
+function neverReachedServer(err: unknown): boolean {
+  const cause = err instanceof Error ? err.cause : undefined
+  return isRecord(cause) && typeof cause.code === "string" && NOT_SENT_CODES.has(cause.code)
 }
 
 function describeCause(err: unknown): string {

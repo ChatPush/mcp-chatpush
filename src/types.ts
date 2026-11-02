@@ -4,6 +4,9 @@ import { z } from "zod"
 // HTTP client
 // ---------------------------------------------------------------------------
 
+/** stdio = local server on the user's machine; http = hosted server (https://mcp.chatpush.ru). */
+export type ServerMode = "stdio" | "http"
+
 export type HttpMethod = "GET" | "POST" | "PUT" | "PATCH" | "DELETE"
 
 export type QueryPrimitive = string | number | boolean

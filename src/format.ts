@@ -27,6 +27,20 @@ export function maskSecret(secret: string | null | undefined): string | undefine
   return secret.length <= 12 ? "**** (masked)" : `${secret.slice(0, 6)}…${secret.slice(-4)} (masked)`
 }
 
+const SECRET_KEY = /token|secret|password|api_?key/i
+
+/** Deep copy with secret-looking fields replaced, for raw API responses shown to the model. */
+export function redactSecrets(value: unknown): unknown {
+  if (Array.isArray(value)) return value.map(redactSecrets)
+  if (!isRecord(value)) return value
+  return Object.fromEntries(
+    Object.entries(value).map(([key, item]) => [
+      key,
+      SECRET_KEY.test(key) && typeof item === "string" ? (maskSecret(item) ?? item) : redactSecrets(item),
+    ]),
+  )
+}
+
 export function formatBytes(bytes: number): string {
   if (bytes < 1024) return `${bytes} B`
   if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`

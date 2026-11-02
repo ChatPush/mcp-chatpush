@@ -30,15 +30,15 @@ The server collects **no** analytics, telemetry, crash reports, device identifie
 - **No database, cache or history.** Tool inputs and API responses live in memory only while a request is processed.
 - **Local mode:** the token is stored by your MCP client — Claude Desktop keeps settings marked as sensitive in its secure storage; other clients keep it in their configuration file or in a local `.env` file you create.
 - **Remote mode:** the token arrives with each request, is used for that request and is never written to disk or logs. The hosted server is stateless and keeps no session data between requests.
-- `send_file` reads the file you point to, or downloads it from the URL you give, only to upload it to ChatPush. No copy is kept.
-- Diagnostic logs go to the process's standard error stream and never contain the token. With `CHATPUSH_DEBUG=1` they include request URLs, which may contain message text and phone numbers.
+- `send_file` reads the file you point to, or downloads it from the URL you give, only to upload it to ChatPush. No copy is kept. The hosted server accepts only file content sent in the request (base64): it never reads files from its own disk or downloads URLs.
+- Diagnostic logs go to the process's standard error stream and never contain the token. With `CHATPUSH_DEBUG=1` they include request URLs: message text is never in them (it is sent in the request body), but read requests may contain phone numbers and IDs.
 - Data you send through the server is stored by the ChatPush service as described in the [CHATPUSH LLC Privacy Policy](https://chatpush.ru/jp/privacypolicy).
 
 ## 4. Sharing
 
 - The server sends data only to the ChatPush API over HTTPS.
 - To deliver messages, the ChatPush service passes message content and recipient identifiers to the channels you select (WhatsApp, Telegram, SMS, VK/OK, MAX).
-- If you use `send_file` with a URL, the server downloads the file from that URL, so the site hosting it receives that request.
+- If you use `send_file` with a URL (local mode only), the server downloads the file from that URL, so the site hosting it receives that request.
 - The AI assistant you use receives tool inputs and results as part of your conversation, governed by that provider's privacy policy.
 
 ## 5. Retention
