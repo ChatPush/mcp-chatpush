@@ -67,6 +67,7 @@ Authorization: Bearer <ChatPush API token>
 - Transport: **Streamable HTTP** (MCP protocol 2025-06-18), JSON responses enabled.
 - **Stateless:** a fresh server instance per request, so it scales horizontally behind any proxy.
 - **No credentials on the server:** the token is read from the request header and used only for that request. Nothing is stored or logged.
+- **OAuth sign-in** for clients that connect by URL and speak only OAuth (Claude.ai, ChatGPT in the browser): see below. A plain token in the header keeps working.
 - `GET /healthz` returns `{"status":"ok",...}` without a token, for load-balancer checks.
 - **Files:** `send_file` takes only `file_base64` here. `file_path` and `file_url` are local-mode only: on a shared server they would point at the server's own disk and network. With the default 20 MB request limit, files up to about 14 MB fit.
 
@@ -79,6 +80,22 @@ Connecting from a client that supports remote MCP servers:
 }
 ```
 
+### OAuth sign-in (Claude.ai, ChatGPT)
+
+Web clients cannot send a fixed `Authorization` header, they sign in with OAuth 2.1. With `CHATPUSH_OAUTH_KEY` and `CHATPUSH_PUBLIC_URL` set, the server is its own authorization server:
+
+1. The client gets a 401 on `/mcp` with `WWW-Authenticate: Bearer resource_metadata=...`, reads `/.well-known/oauth-protected-resource/mcp` and `/.well-known/oauth-authorization-server`, and registers itself at `POST /register` (dynamic client registration).
+2. The user lands on `GET /authorize` — a page on the server, in Russian — and pastes their ChatPush API token. The server checks it with `GET /api/v1/account`.
+3. The client exchanges the code at `POST /token` (PKCE S256 required) and gets an access token (`cpo_…`, 1 hour) and a refresh token (90 days).
+
+Nothing is stored: registrations, codes and tokens are sealed with AES-256-GCM under `CHATPUSH_OAUTH_KEY` and carry the ChatPush token inside, so the server stays stateless. Consequences:
+
+- **Sign everyone out:** change `CHATPUSH_OAUTH_KEY`. To rotate without that, put the new key first and keep the old one after a comma until refresh tokens renew.
+- **Sign one account out:** regenerate the API token in the ChatPush dashboard. Access tokens stop at the next refresh, within an hour.
+- A code is single-use per server process; with several instances behind a balancer, a code could be redeemed once per instance within its 5 minutes, still bound to the client and its PKCE verifier.
+
+Give the key to the server like any secret (environment, not the image): `openssl rand -base64 32`.
+
 ### Deployment
 
 ```bash
@@ -88,7 +105,7 @@ docker run -p 3000:3000 -e CHATPUSH_ALLOWED_HOSTS=mcp.chatpush.ru chatpush-mcp-s
 
 Without Docker: `npm ci && npm run build && npm run start:http`.
 
-Put TLS in front (nginx, Traefik, a cloud load balancer) and point `mcp.chatpush.ru` at it. The service needs no database, no disk and no secrets.
+Put TLS in front (nginx, Traefik, a cloud load balancer) and point `mcp.chatpush.ru` at it. The service needs no database and no disk; the only secret is `CHATPUSH_OAUTH_KEY` when OAuth is on. With OAuth, the proxy must pass `/.well-known/`, `/register`, `/authorize` and `/token` as well as `/mcp`.
 
 | Variable | Default | Description |
 | --- | --- | --- |
@@ -100,6 +117,9 @@ Put TLS in front (nginx, Traefik, a cloud load balancer) and point `mcp.chatpush
 | `CHATPUSH_MAX_BODY_MB` | `20` | Largest request body, in MB. Bigger requests get 413 before they are read |
 | `CHATPUSH_MAX_CONCURRENT_REQUESTS` | `32` | MCP requests handled at once; the rest get 503 with `Retry-After` |
 | `CHATPUSH_ALLOWED_ORIGIN` | `*` | Value for `Access-Control-Allow-Origin` |
+| `CHATPUSH_PUBLIC_URL` | — | Public https origin, e.g. `https://mcp.chatpush.ru`: the OAuth issuer. Required with `CHATPUSH_OAUTH_KEY` |
+| `CHATPUSH_OAUTH_KEY` | — | Turns OAuth sign-in on. 32 bytes, base64 or hex (`openssl rand -base64 32`); several comma-separated for rotation, the first one signs |
+| `CHATPUSH_TRUST_PROXY` | `0` | `1` takes the client IP from `X-Forwarded-For` for the sign-in attempt limit (10 per 10 minutes per IP). Set it behind nginx |
 | `CHATPUSH_DEBUG` | `0` | `1` logs every request (method and URL) to stderr. Read requests carry IDs and phone numbers in the URL, so keep it off in production |
 
 ## Local mode (stdio)
