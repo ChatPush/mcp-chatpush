@@ -1,5 +1,9 @@
 # Changelog
 
+## Unreleased (1.1.0)
+
+- Hosted server: OAuth 2.1 sign-in for web clients that connect only with OAuth (Claude.ai, ChatGPT). The server is its own authorization server — resource and server metadata, dynamic client registration, PKCE S256, refresh tokens — and the user signs in by pasting the ChatPush API token on a Russian page. Stateless: everything is sealed with `CHATPUSH_OAUTH_KEY`. Off unless `CHATPUSH_OAUTH_KEY` and `CHATPUSH_PUBLIC_URL` are set; a plain token in the `Authorization` header keeps working.
+
 ## 1.0.1 — 2026-11-17
 
 - MCP Registry name is now `io.github.ChatPush/whatsapp-telegram-max-sms` (searchable by channel names). The old entry `io.github.ChatPush/mcp-chatpush` should be marked deprecated after the release.
