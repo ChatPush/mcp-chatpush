@@ -1,12 +1,14 @@
 // The remote MCP server (Streamable HTTP). src/http.ts starts it; tests create it directly.
 //
-// Every request carries the caller's own ChatPush token in the Authorization header; the server
-// stores no credentials and keeps no session state, so it can run behind any load balancer.
+// Every request carries the caller's own ChatPush token in the Authorization header — as is, or
+// inside an OAuth access token (src/oauth.ts). The server stores no credentials and keeps no
+// session state, so it can run behind any load balancer.
 import { createServer, type IncomingMessage, type Server, type ServerResponse } from "node:http"
 import { StreamableHTTPServerTransport } from "@modelcontextprotocol/sdk/server/streamableHttp.js"
 import { SERVER_NAME, SERVER_VERSION, type Config } from "./config.js"
 import { formatBytes } from "./format.js"
 import { log } from "./logger.js"
+import { ACCESS_TOKEN_PREFIX, type OAuthProvider } from "./oauth.js"
 import { createMcpServer, tools } from "./server.js"
 
 export interface HttpServerOptions {
@@ -20,6 +22,8 @@ export interface HttpServerOptions {
   maxBodyBytes: number
   /** MCP requests handled at the same time; the rest get 503. */
   maxConcurrentRequests: number
+  /** OAuth sign-in for web clients (Claude.ai, ChatGPT). Off when undefined: tokens in the header only. */
+  oauth?: OAuthProvider
 }
 
 class HttpError extends Error {
@@ -77,7 +81,7 @@ export function createHttpServer(config: Config, options: HttpServerOptions): Se
     "Access-Control-Allow-Origin": options.allowedOrigin,
     "Access-Control-Allow-Methods": "GET, POST, DELETE, OPTIONS",
     "Access-Control-Allow-Headers": "Content-Type, Authorization, Mcp-Session-Id, MCP-Protocol-Version, Last-Event-ID",
-    "Access-Control-Expose-Headers": "Mcp-Session-Id",
+    "Access-Control-Expose-Headers": "Mcp-Session-Id, WWW-Authenticate",
     "Access-Control-Max-Age": "86400",
   })
 
@@ -110,11 +114,6 @@ export function createHttpServer(config: Config, options: HttpServerOptions): Se
       return
     }
 
-    if (url.pathname !== options.mcpPath) {
-      sendJson(res, 404, { error: "Not found", endpoint: options.mcpPath })
-      return
-    }
-
     // DNS-rebinding protection, after /healthz so load balancers can probe by IP.
     // Our own check: the SDK's allowedHosts option is deprecated.
     if (allowedHosts.size && !allowedHosts.has(hostnameOf(req.headers.host ?? ""))) {
@@ -122,16 +121,32 @@ export function createHttpServer(config: Config, options: HttpServerOptions): Se
       return
     }
 
-    const token = tokenFromRequest(req)
+    if (options.oauth && (await options.oauth.handle(req, res, url))) return
+
+    if (url.pathname !== options.mcpPath) {
+      sendJson(res, 404, { error: "Not found", endpoint: options.mcpPath })
+      return
+    }
+
+    let token = tokenFromRequest(req)
     if (!token) {
       sendRpcError(
         res,
         401,
         -32001,
         "Missing ChatPush token. Send it as: Authorization: Bearer <token from the ChatPush dashboard>",
-        { "WWW-Authenticate": 'Bearer realm="ChatPush MCP"' },
+        { "WWW-Authenticate": options.oauth ? options.oauth.challenge() : 'Bearer realm="ChatPush MCP"' },
       )
       return
+    }
+    if (options.oauth && token.startsWith(ACCESS_TOKEN_PREFIX)) {
+      token = options.oauth.tokenFromAccessToken(token)
+      if (!token) {
+        sendRpcError(res, 401, -32001, "The access token is invalid or expired; sign in again.", {
+          "WWW-Authenticate": options.oauth.challenge("invalid_token"),
+        })
+        return
+      }
     }
 
     if (activeRequests >= options.maxConcurrentRequests) {
