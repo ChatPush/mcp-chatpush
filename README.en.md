@@ -47,7 +47,7 @@ It runs in two modes from the same codebase:
 
 ## Get a token
 
-1. Sign up at **[chatpush.ru](https://chatpush.ru/customers/sign_up?utm_source=github&utm_medium=readme_en&utm_campaign=mcp)** — the first 10 days are free.
+1. Sign up at **[chatpush.ru](https://chatpush.ru/customers/sign_up?partner=apimcp&utm_source=github&utm_medium=readme_en&utm_campaign=mcp)** — the first 10 days are free.
 2. Copy the API token from the dashboard: **Integrations** (`https://chatpush.ru/front_office/integrations`).
 3. To send through WhatsApp, Telegram or MAX, connect the messenger in the dashboard first — or ask the assistant "connect my WhatsApp" (`get_messenger_auth_link`) and scan the QR code.
 

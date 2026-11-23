@@ -8,7 +8,7 @@ Official MCP server for [ChatPush](https://chatpush.ru/integrations/mcp?utm_sour
 
 ## Install it for a user
 
-1. The user needs a ChatPush API token: sign up at https://chatpush.ru/customers/sign_up (10 days free), then copy the token from https://chatpush.ru/front_office/integrations. Never invent a token and never commit it.
+1. The user needs a ChatPush API token: sign up at https://chatpush.ru/customers/sign_up?partner=apimcp (10 days free), then copy the token from https://chatpush.ru/front_office/integrations. Never invent a token and never commit it.
 2. Run locally (stdio, Node.js 20+): `npx -y chatpush-mcp-server` with env `CHATPUSH_TOKEN`.
    - Claude Code: `claude mcp add chatpush --env CHATPUSH_TOKEN=<token> -- npx -y chatpush-mcp-server`
    - Claude Desktop: one-file extension https://github.com/ChatPush/mcp-chatpush/releases/latest/download/chatpush-mcp-server.mcpb

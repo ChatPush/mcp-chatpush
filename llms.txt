@@ -2,7 +2,7 @@
 
 > Official open-source (MIT) MCP server for ChatPush, a Russian business messaging service. It lets Claude, Cursor, VS Code and other AI agents send WhatsApp, Telegram (personal account or bot), MAX, SMS and VK/OK messages, files and bulk mailings, check delivery status and connect a messenger by QR code. npm package: chatpush-mcp-server. MCP Registry name: io.github.ChatPush/whatsapp-telegram-max-sms.
 
-Requires a ChatPush API token (sign up at https://chatpush.ru, 10 days free; token in Dashboard → Integrations). Runs locally via `npx -y chatpush-mcp-server` with env CHATPUSH_TOKEN, or as a Claude Desktop extension (.mcpb). The hosted endpoint https://mcp.chatpush.ru/mcp is launching soon.
+Requires a ChatPush API token (sign up at https://chatpush.ru/customers/sign_up?partner=apimcp, 10 days free; token in Dashboard → Integrations). Runs locally via `npx -y chatpush-mcp-server` with env CHATPUSH_TOKEN, or as a Claude Desktop extension (.mcpb). The hosted endpoint https://mcp.chatpush.ru/mcp is launching soon.
 
 ## Docs
 

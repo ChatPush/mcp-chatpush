@@ -4,7 +4,7 @@ MCP-сервер ChatPush даёт Claude (Desktop или Code) отправку
 
 ## Шаг 1. Токен ChatPush
 
-1. Зарегистрируйтесь на [chatpush.ru](https://chatpush.ru/customers/sign_up?utm_source=github&utm_medium=guide&utm_campaign=mcp), первые 10 дней бесплатно.
+1. Зарегистрируйтесь на [chatpush.ru](https://chatpush.ru/customers/sign_up?partner=apimcp&utm_source=github&utm_medium=guide&utm_campaign=mcp), первые 10 дней бесплатно.
 2. Скопируйте API-токен в кабинете: раздел «Интеграции» (`https://chatpush.ru/front_office/integrations`).
 
 ## Шаг 2. Подключите номер WhatsApp

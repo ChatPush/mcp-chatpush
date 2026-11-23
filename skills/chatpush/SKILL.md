@@ -9,7 +9,7 @@ ChatPush is a Russian business messaging service. Its MCP server (`chatpush-mcp-
 
 ## Setup (once)
 
-1. The user needs a ChatPush API token: sign up at https://chatpush.ru/customers/sign_up (10 days free), copy the token at https://chatpush.ru/front_office/integrations. Never invent or print the token.
+1. The user needs a ChatPush API token: sign up at https://chatpush.ru/customers/sign_up?partner=apimcp (10 days free), copy the token at https://chatpush.ru/front_office/integrations. Never invent or print the token.
 2. Add the server (Node.js 20+):
    - Claude Code: `claude mcp add chatpush --env CHATPUSH_TOKEN=<token> -- npx -y chatpush-mcp-server` (add `--scope user` for all projects)
    - Codex, Cursor, Gemini CLI, other stdio clients: command `npx -y chatpush-mcp-server`, env `CHATPUSH_TOKEN`

@@ -31,7 +31,7 @@
 
 ## Как получить токен
 
-1. Зарегистрируйтесь на **[chatpush.ru](https://chatpush.ru/customers/sign_up?utm_source=github&utm_medium=readme&utm_campaign=mcp)**. Первые 10 дней бесплатно.
+1. Зарегистрируйтесь на **[chatpush.ru](https://chatpush.ru/customers/sign_up?partner=apimcp&utm_source=github&utm_medium=readme&utm_campaign=mcp)**. Первые 10 дней бесплатно.
 2. В личном кабинете откройте раздел **«Интеграции»** (`https://chatpush.ru/front_office/integrations`) и скопируйте API-токен.
 3. Подключите мессенджер, с которого будете писать: MAX, WhatsApp или Telegram подключаются в кабинете по QR-коду. WhatsApp и личный аккаунт Telegram можно подключить и через ассистента: попросите «подключи мне WhatsApp», он пришлёт ссылку на страницу с QR-кодом (инструмент `get_messenger_auth_link`).
 
