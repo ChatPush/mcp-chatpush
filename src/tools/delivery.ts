@@ -123,7 +123,7 @@ const getDeliveryStatus = defineTool({
     "Get the current status and full details of a specific message delivery by its ID. Returns status, operator info, phone, scheduled time, costs and more. " +
     "Use it after send_message or send_file when the user asks whether a message was delivered or read, or why it failed — the status is explained in plain words.",
   inputSchema: {
-    id: z.number().int().positive().describe("Delivery ID from the send_message or send_file response."),
+    id: z.coerce.number().int().positive().describe("Delivery ID from the send_message or send_file response."),
   },
   annotations: { readOnlyHint: true, openWorldHint: true },
   async handler(args, { client }) {
@@ -144,7 +144,7 @@ const deleteDelivery = defineTool({
     "Only messages sent through ChatPush via the tdlib or whatsapp channels can be deleted; SMS cannot. Use it when the user asks to unsend or recall a message.",
   ].join("\n\n"),
   inputSchema: {
-    delivery_id: z.number().int().positive().describe("ID of the delivered message to delete (delivery.id from send_message)."),
+    delivery_id: z.coerce.number().int().positive().describe("ID of the delivered message to delete (delivery.id from send_message)."),
   },
   annotations: { readOnlyHint: false, destructiveHint: true, idempotentHint: true, openWorldHint: true },
   async handler(args, { client }) {

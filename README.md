@@ -32,7 +32,7 @@
 ## Как получить токен
 
 1. Зарегистрируйтесь на **[chatpush.ru](https://chatpush.ru/customers/sign_up?partner=apimcp&utm_source=github&utm_medium=readme&utm_campaign=mcp)**. Первые 10 дней бесплатно.
-2. В личном кабинете откройте раздел **«Интеграции»** (`https://chatpush.ru/front_office/integrations`) и скопируйте API-токен.
+2. В [личном кабинете](https://chatpush.ru/front_office) откройте **Настройки → API/Доступы** и скопируйте **Bearer Token**.
 3. Подключите мессенджер, с которого будете писать: MAX, WhatsApp или Telegram подключаются в кабинете по QR-коду. WhatsApp и личный аккаунт Telegram можно подключить и через ассистента: попросите «подключи мне WhatsApp», он пришлёт ссылку на страницу с QR-кодом (инструмент `get_messenger_auth_link`).
 
 Токен даёт доступ к отправке с вашего аккаунта. Храните его как пароль и не публикуйте в репозиториях.
@@ -99,7 +99,7 @@ claude mcp add chatpush --env CHATPUSH_TOKEN=ваш_токен -- npx -y chatpus
 codex mcp add chatpush --env CHATPUSH_TOKEN=ваш_токен -- npx -y chatpush-mcp-server
 ```
 
-Приложение ChatGPT для компьютера читает ту же конфигурацию Codex (`~/.codex/config.toml`). ChatGPT в браузере подключает только серверы по ссылке: появится вместе с удалённым сервером. Подробно: [guides/chatgpt-codex](guides/chatgpt-codex/).
+Приложение ChatGPT для компьютера читает ту же конфигурацию Codex (`~/.codex/config.toml`). ChatGPT в браузере подключает серверы по ссылке: добавьте коннектор с адресом `https://mcp.chatpush.ru/mcp`, вход — по токену ChatPush (доступность своих коннекторов зависит от плана ChatGPT). Подробно: [guides/chatgpt-codex](guides/chatgpt-codex/).
 
 ### Gemini CLI и GitHub Copilot
 
@@ -197,9 +197,11 @@ MAX — российский мессенджер. Через ChatPush асси�
 
 ## Удалённый MCP-сервер по ссылке
 
-> **Скоро.** Адрес `mcp.chatpush.ru` ещё не запущен. Пока пользуйтесь расширением для Claude Desktop или запуском через `npx`.
+Сервер по ссылке не нужно устанавливать: подойдёт платформам, которые подключают MCP по адресу, и тем, у кого нет Node.js.
 
-Удалённый сервер нужен платформам, которые подключают MCP по ссылке, и тем, у кого нет Node.js:
+**Claude.ai** (в браузере и в приложениях Claude): *Настройки → Коннекторы → Добавить свой коннектор*, адрес `https://mcp.chatpush.ru/mcp`. Откроется страница «Вход — ChatPush»: вставьте Bearer Token из кабинета и нажмите «Разрешить доступ». Логин и пароль ChatPush не нужны.
+
+**Другие клиенты и платформы** (n8n, свой код) передают токен в заголовке:
 
 ```
 POST https://mcp.chatpush.ru/mcp

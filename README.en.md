@@ -14,7 +14,7 @@ What makes it different from other WhatsApp MCP and Telegram MCP servers:
 - **One server, six channels.** WhatsApp, a personal Telegram account, Telegram Bot, MAX (the Russian messenger), SMS and VK/OK — with a cascade: if one channel does not deliver, the next one is tried.
 - **MAX messenger MCP.** Sends business messages to MAX, the Russian messenger, by phone number — on its own or as a step of the cascade.
 - **No double sends.** After a network failure the server never retries a send on its own; the agent is told to check the status first.
-- **Two ways to run it.** A one-file Claude Desktop extension (`.mcpb`) or `npx` today; a hosted remote MCP endpoint is launching soon.
+- **Two ways to run it.** A one-file Claude Desktop extension (`.mcpb`), `npx`, or the hosted endpoint `https://mcp.chatpush.ru/mcp` for Claude.ai and other clients that connect by URL.
 
 > Looking for a way to chat with your own coding agent from Telegram? That is a different scenario. This server is for agents that message **your customers**.
 
@@ -24,7 +24,7 @@ It runs in two modes from the same codebase:
 
 | Mode | Transport | Who it is for | Token |
 | --- | --- | --- | --- |
-| **Remote** | Streamable HTTP, hosted at `https://mcp.chatpush.ru/mcp` | Yandex and other platforms that connect to a URL; users with no local Node.js | Each caller sends their own token in the `Authorization` header |
+| **Remote** | Streamable HTTP, hosted at `https://mcp.chatpush.ru/mcp` | Claude.ai, n8n and other platforms that connect to a URL; users with no local Node.js | Each caller sends their own token in the `Authorization` header |
 | **Local** | stdio, `npx -y chatpush-mcp-server` | Claude Desktop, Claude Code, Cursor, VS Code | `CHATPUSH_TOKEN` in the client config |
 
 ## Tools
@@ -48,14 +48,12 @@ It runs in two modes from the same codebase:
 ## Get a token
 
 1. Sign up at **[chatpush.ru](https://chatpush.ru/customers/sign_up?partner=apimcp&utm_source=github&utm_medium=readme_en&utm_campaign=mcp)** — the first 10 days are free.
-2. Copy the API token from the dashboard: **Integrations** (`https://chatpush.ru/front_office/integrations`).
+2. Copy the API token from the [dashboard](https://chatpush.ru/front_office): **Настройки → API/Доступы → Bearer Token** (Settings → API/Access).
 3. To send through WhatsApp, Telegram or MAX, connect the messenger in the dashboard first — or ask the assistant "connect my WhatsApp" (`get_messenger_auth_link`) and scan the QR code.
 
 The server itself is free and open source. Messages are billed by your ChatPush plan.
 
 ## Remote mode (hosted)
-
-> **Launching soon.** `mcp.chatpush.ru` is not live yet — until then use the local mode below.
 
 The hosted server exposes one MCP endpoint:
 

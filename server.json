@@ -8,13 +8,19 @@
     "url": "https://github.com/ChatPush/mcp-chatpush",
     "source": "github"
   },
-  "version": "1.1.0",
+  "version": "1.1.1",
+  "remotes": [
+    {
+      "type": "streamable-http",
+      "url": "https://mcp.chatpush.ru/mcp"
+    }
+  ],
   "packages": [
     {
       "registryType": "npm",
       "registryBaseUrl": "https://registry.npmjs.org",
       "identifier": "chatpush-mcp-server",
-      "version": "1.1.0",
+      "version": "1.1.1",
       "transport": {
         "type": "stdio"
       },

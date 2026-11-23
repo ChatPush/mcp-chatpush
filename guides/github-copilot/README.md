@@ -1,11 +1,11 @@
 # GitHub Copilot + ChatPush MCP: сообщения в MAX, WhatsApp\*, Telegram и SMS из VS Code, Copilot CLI и JetBrains
 
-GitHub Copilot в режиме агента подключает локальные MCP-серверы во всех тарифах, включая бесплатный. Microsoft Copilot (приложение для всех) свои серверы не подключает. Copilot Studio подключает серверы по ссылке: для ChatPush это появится вместе с удалённым сервером.
+GitHub Copilot в режиме агента подключает локальные MCP-серверы во всех тарифах, включая бесплатный. Microsoft Copilot (приложение для всех) свои серверы не подключает. Copilot Studio подключает серверы по ссылке: адрес ChatPush `https://mcp.chatpush.ru/mcp`.
 
 ## Токен ChatPush
 
 1. Зарегистрируйтесь на [chatpush.ru](https://chatpush.ru/customers/sign_up?partner=apimcp&utm_source=github&utm_medium=guide&utm_campaign=mcp), первые 10 дней бесплатно.
-2. Скопируйте API-токен в кабинете: раздел «Интеграции» (`https://chatpush.ru/front_office/integrations`).
+2. Скопируйте API-токен в [кабинете](https://chatpush.ru/front_office): **Настройки → API/Доступы → Bearer Token**.
 3. Подключите мессенджер, с которого будете писать: MAX, WhatsApp\* или Telegram — в кабинете по QR-коду.
 
 ## Copilot CLI и VS Code
