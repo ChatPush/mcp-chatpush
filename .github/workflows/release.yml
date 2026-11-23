@@ -92,6 +92,13 @@ jobs:
             echo "$NAME@$VERSION is already in the MCP Registry, skipping"
             exit 0
           fi
+          # The registry checks the npm version; a fresh publish can take a minute to show up there.
+          PKG="$(jq -r .name package.json)"
+          for i in $(seq 1 30); do
+            curl -fsS -o /dev/null "https://registry.npmjs.org/$PKG/$VERSION" && break
+            [ "$i" = 30 ] && { echo "$PKG@$VERSION did not appear on npm in 5 minutes"; exit 1; }
+            echo "Waiting for $PKG@$VERSION on npm ($i/30)..."; sleep 10
+          done
           ./mcp-publisher validate
           ./mcp-publisher login github-oidc
           ./mcp-publisher publish
