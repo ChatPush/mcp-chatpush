@@ -378,12 +378,12 @@ export class OAuthProvider {
     }
     const token = (params.get("token") ?? "").trim().replace(/^Bearer\s+/i, "")
     if (!token || token.length > 1000 || /\s/.test(token)) {
-      again(400, "Вставьте API-токен из раздела «Интеграции» кабинета ChatPush.")
+      again(400, "Вставьте Bearer Token из кабинета ChatPush: Настройки → API/Доступы.")
       return
     }
     const check = await this.options.verifyToken(token)
     if (check === "invalid") {
-      again(400, "ChatPush не принял этот токен. Скопируйте его ещё раз в разделе «Интеграции» кабинета.")
+      again(400, "ChatPush не принял этот токен. Скопируйте его ещё раз: Настройки → API/Доступы → Bearer Token.")
       return
     }
     if (check === "unavailable") {
@@ -549,10 +549,10 @@ ${error ? `<p class="error" role="alert">${escapeHtml(error)}</p>` : ""}
 <input type="hidden" name="request" value="${escapeHtml(request)}">
 <label for="token">API-токен ChatPush</label>
 <input type="password" id="token" name="token" required autofocus spellcheck="false">
-<p class="muted" style="margin-top:8px">Токен — в кабинете ChatPush, раздел <a href="https://chatpush.ru/front_office/integrations" target="_blank" rel="noopener noreferrer">«Интеграции»</a>. Нет аккаунта — <a href="https://chatpush.ru/customers/sign_up?partner=apimcp&amp;utm_source=mcp&amp;utm_medium=oauth&amp;utm_campaign=mcp" target="_blank" rel="noopener noreferrer">10 дней бесплатно</a>.</p>
+<p class="muted" style="margin-top:8px">Токен — в <a href="https://chatpush.ru/front_office" target="_blank" rel="noopener noreferrer">кабинете ChatPush</a>: Настройки → API/Доступы → Bearer Token. Нет аккаунта — <a href="https://chatpush.ru/customers/sign_up?partner=apimcp&amp;utm_source=mcp&amp;utm_medium=oauth&amp;utm_campaign=mcp" target="_blank" rel="noopener noreferrer">10 дней бесплатно</a>.</p>
 <div class="row"><button type="submit" name="action" value="allow" class="primary">Разрешить доступ</button><button type="submit" name="action" value="deny" formnovalidate>Отмена</button></div>
 </form>
-<p class="muted" style="margin-top:18px">Отозвать доступ: создайте новый API-токен в разделе «Интеграции» — подключение перестанет работать в течение часа.</p>`,
+<p class="muted" style="margin-top:18px">Отозвать доступ: выпустите новый токен в разделе Настройки → API/Доступы — подключение перестанет работать в течение часа.</p>`,
   )
 }
 

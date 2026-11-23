@@ -3,7 +3,7 @@
   "manifest_version": "0.3",
   "name": "chatpush-mcp-server",
   "display_name": "ChatPush",
-  "version": "1.1.0",
+  "version": "1.1.1",
   "description": "Send WhatsApp, Telegram, SMS and MAX messages, files and bulk mailings via ChatPush",
   "long_description": "Official ChatPush extension. Lets Claude send text messages and files through WhatsApp, a personal Telegram account, Telegram bots, SMS, VK/OK and MAX — with channel cascades, scheduling and bulk mailings — check delivery status, look up phone numbers, manage webhooks, rename chat contacts, connect messengers and manage sub-clients. Requires a ChatPush token from https://chatpush.ru.",
   "author": {

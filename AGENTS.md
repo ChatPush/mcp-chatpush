@@ -8,14 +8,14 @@ Official MCP server for [ChatPush](https://chatpush.ru/integrations/mcp?utm_sour
 
 ## Install it for a user
 
-1. The user needs a ChatPush API token: sign up at https://chatpush.ru/customers/sign_up?partner=apimcp (10 days free), then copy the token from https://chatpush.ru/front_office/integrations. Never invent a token and never commit it.
+1. The user needs a ChatPush API token: sign up at https://chatpush.ru/customers/sign_up?partner=apimcp (10 days free), then copy the token from the dashboard https://chatpush.ru/front_office: Настройки → API/Доступы → Bearer Token (Settings → API/Access). Never invent a token and never commit it.
 2. Run locally (stdio, Node.js 20+): `npx -y chatpush-mcp-server` with env `CHATPUSH_TOKEN`.
    - Claude Code: `claude mcp add chatpush --env CHATPUSH_TOKEN=<token> -- npx -y chatpush-mcp-server`
    - Claude Desktop: one-file extension https://github.com/ChatPush/mcp-chatpush/releases/latest/download/chatpush-mcp-server.mcpb
    - Cursor / VS Code / other clients: see [README.md](README.md#быстрый-старт).
 3. Verify: call `get_balance`. A balance in the answer means the token works.
 
-The hosted endpoint `https://mcp.chatpush.ru/mcp` (Streamable HTTP, `Authorization: Bearer <token>`) is not live yet; use the local mode.
+Hosted endpoint: `https://mcp.chatpush.ru/mcp` (Streamable HTTP, `Authorization: Bearer <token>`, or OAuth sign-in for Claude.ai and other web clients). Use it when the client connects to MCP servers by URL; otherwise use the local mode.
 
 A ready agent skill with the same rules: [`skills/chatpush/SKILL.md`](skills/chatpush/SKILL.md).
 

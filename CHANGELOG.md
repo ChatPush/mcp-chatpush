@@ -1,5 +1,12 @@
 # Changelog
 
+## 1.1.1 — 2026-11-23
+
+- The hosted server is live at `https://mcp.chatpush.ru/mcp` and listed in the MCP Registry (`remotes`). Checked end to end with a Claude.ai custom connector: OAuth sign-in, balance, a Telegram send.
+- Token location fixed everywhere, including the OAuth sign-in page: dashboard → Настройки → API/Доступы → Bearer Token (was "Интеграции").
+- `get_delivery_status` and `delete_delivery` accept the delivery ID as a number or a numeric string.
+- README and guides: Claude.ai, ChatGPT in the browser, n8n MCP Client Tool and Copilot Studio connect by URL.
+
 ## 1.1.0 — 2026-11-23
 
 - Hosted server: OAuth 2.1 sign-in for web clients that connect only with OAuth (Claude.ai, ChatGPT). The server is its own authorization server — resource and server metadata, dynamic client registration, PKCE S256, refresh tokens — and the user signs in by pasting the ChatPush API token on a Russian page. Stateless: everything is sealed with `CHATPUSH_OAUTH_KEY`. Off unless `CHATPUSH_OAUTH_KEY` and `CHATPUSH_PUBLIC_URL` are set; a plain token in the `Authorization` header keeps working.

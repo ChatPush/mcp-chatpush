@@ -1,11 +1,11 @@
 # ChatGPT и Codex + ChatPush MCP: сообщения клиентам в MAX, WhatsApp\*, Telegram и SMS
 
-Приложение ChatGPT для компьютера и Codex (CLI, расширение для редактора) подключают локальные MCP-серверы. С сервером ChatPush они отправляют сообщения, файлы и рассылки клиентам с номеров вашей компании. ChatGPT в браузере пока подключает только серверы по ссылке с входом через OAuth: для ChatPush это появится позже.
+Приложение ChatGPT для компьютера и Codex (CLI, расширение для редактора) подключают локальные MCP-серверы. С сервером ChatPush они отправляют сообщения, файлы и рассылки клиентам с номеров вашей компании. ChatGPT в браузере подключает серверы по ссылке: адрес ChatPush `https://mcp.chatpush.ru/mcp`, вход по токену ChatPush (доступность своих коннекторов зависит от плана ChatGPT).
 
 ## Токен ChatPush
 
 1. Зарегистрируйтесь на [chatpush.ru](https://chatpush.ru/customers/sign_up?partner=apimcp&utm_source=github&utm_medium=guide&utm_campaign=mcp), первые 10 дней бесплатно.
-2. Скопируйте API-токен в кабинете: раздел «Интеграции» (`https://chatpush.ru/front_office/integrations`).
+2. Скопируйте API-токен в [кабинете](https://chatpush.ru/front_office): **Настройки → API/Доступы → Bearer Token**.
 3. Подключите мессенджер, с которого будете писать: MAX, WhatsApp\* или Telegram — в кабинете по QR-коду.
 
 ## Подключение

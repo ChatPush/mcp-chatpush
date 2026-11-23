@@ -24,7 +24,7 @@
 ## Токен ChatPush
 
 1. Зарегистрируйтесь на [chatpush.ru](https://chatpush.ru/customers/sign_up?partner=apimcp&utm_source=github&utm_medium=guide&utm_campaign=mcp), первые 10 дней бесплатно.
-2. Скопируйте API-токен в кабинете: раздел «Интеграции» (`https://chatpush.ru/front_office/integrations`).
+2. Скопируйте API-токен в [кабинете](https://chatpush.ru/front_office): **Настройки → API/Доступы → Bearer Token**.
 3. Подключите мессенджер, с которого будете писать: MAX, WhatsApp\* или Telegram — в кабинете по QR-коду.
 
 ## Где лежат настройки
