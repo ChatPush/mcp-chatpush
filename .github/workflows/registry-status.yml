@@ -1,0 +1,53 @@
+# Manually change the status of a server version in the MCP Registry
+# (deprecate an old name, restore it, delete a broken version).
+# Signs in with GitHub OIDC, which owns the io.github.ChatPush/* namespace.
+name: Registry status
+
+on:
+  workflow_dispatch:
+    inputs:
+      server:
+        description: Server name, e.g. io.github.ChatPush/mcp-chatpush
+        required: true
+      version:
+        description: Version (leave empty for all versions)
+        required: false
+      status:
+        description: New status
+        required: true
+        type: choice
+        options: [deprecated, active, deleted]
+      message:
+        description: Reason shown in the registry
+        required: false
+
+permissions:
+  contents: read
+  id-token: write
+
+env:
+  MCP_PUBLISHER_VERSION: v1.8.15
+
+jobs:
+  status:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Install mcp-publisher
+        run: |
+          curl -fsSL "https://github.com/modelcontextprotocol/registry/releases/download/${MCP_PUBLISHER_VERSION}/mcp-publisher_linux_amd64.tar.gz" | tar xz mcp-publisher
+
+      - name: Update status
+        env:
+          SERVER: ${{ inputs.server }}
+          VERSION: ${{ inputs.version }}
+          STATUS: ${{ inputs.status }}
+          MESSAGE: ${{ inputs.message }}
+        run: |
+          ./mcp-publisher login github-oidc
+          args=(--status "$STATUS")
+          [ -n "$MESSAGE" ] && args+=(--message "$MESSAGE")
+          if [ -n "$VERSION" ]; then
+            yes | ./mcp-publisher status "${args[@]}" "$SERVER" "$VERSION"
+          else
+            yes | ./mcp-publisher status "${args[@]}" --all-versions "$SERVER"
+          fi
