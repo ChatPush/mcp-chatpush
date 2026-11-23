@@ -549,7 +549,7 @@ ${error ? `<p class="error" role="alert">${escapeHtml(error)}</p>` : ""}
 <input type="hidden" name="request" value="${escapeHtml(request)}">
 <label for="token">API-токен ChatPush</label>
 <input type="password" id="token" name="token" required autofocus spellcheck="false">
-<p class="muted" style="margin-top:8px">Токен — в кабинете ChatPush, раздел <a href="https://chatpush.ru/front_office/integrations" target="_blank" rel="noopener noreferrer">«Интеграции»</a>. Нет аккаунта — <a href="https://chatpush.ru/customers/sign_up" target="_blank" rel="noopener noreferrer">10 дней бесплатно</a>.</p>
+<p class="muted" style="margin-top:8px">Токен — в кабинете ChatPush, раздел <a href="https://chatpush.ru/front_office/integrations" target="_blank" rel="noopener noreferrer">«Интеграции»</a>. Нет аккаунта — <a href="https://chatpush.ru/customers/sign_up?partner=apimcp&amp;utm_source=mcp&amp;utm_medium=oauth&amp;utm_campaign=mcp" target="_blank" rel="noopener noreferrer">10 дней бесплатно</a>.</p>
 <div class="row"><button type="submit" name="action" value="allow" class="primary">Разрешить доступ</button><button type="submit" name="action" value="deny" formnovalidate>Отмена</button></div>
 </form>
 <p class="muted" style="margin-top:18px">Отозвать доступ: создайте новый API-токен в разделе «Интеграции» — подключение перестанет работать в течение часа.</p>`,
