@@ -1,6 +1,6 @@
 {
   "name": "chatpush-mcp-server",
-  "version": "1.0.1",
+  "version": "1.1.0",
   "description": "MCP server for ChatPush: Claude and AI agents send WhatsApp, Telegram, MAX, SMS and VK messages, files and bulk mailings",
   "type": "module",
   "bin": {
