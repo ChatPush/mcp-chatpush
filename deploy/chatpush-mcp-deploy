@@ -1,0 +1,123 @@
+#!/usr/bin/env bash
+# Deploys a tagged release of the hosted server at https://mcp.chatpush.ru.
+#
+# Install on the server as root:
+#   install -o root -g root -m 755 deploy/chatpush-mcp-deploy /usr/local/bin/chatpush-mcp-deploy
+# and pin the GitHub Actions deploy key to it in /home/deploy/.ssh/authorized_keys:
+#   command="/usr/local/bin/chatpush-mcp-deploy",restrict ssh-ed25519 AAAA... github-actions-deploy
+# The script lives outside the git checkout on purpose: `git checkout` must never rewrite the
+# script while it is running, and the deploy key must not be able to change what it runs.
+#
+# The action comes from SSH_ORIGINAL_COMMAND (the command the SSH client asked for):
+#   deploy vX.Y.Z   build that tag if needed, switch the container to it, roll back if it fails
+#   status          print the running version
+# Runs as the `deploy` user (member of the docker group). The env file is never read or changed.
+set -euo pipefail
+umask 022
+
+REPO_DIR=/home/deploy/mcp-chatpush
+ENV_FILE=/etc/chatpush-mcp.env
+CONTAINER=chatpush-mcp
+IMAGE=chatpush-mcp-server
+KEEP_IMAGES=3
+
+log() { printf '%s %s\n' "$(date -u +%FT%TZ)" "$*"; }
+die() { log "ERROR: $*"; exit 1; }
+
+# Version reported by the running container's /healthz (needs no token, no ChatPush calls).
+running_version() {
+  docker exec "$CONTAINER" node -e \
+    "fetch('http://127.0.0.1:'+(process.env.PORT||3000)+'/healthz').then(r=>r.json()).then(j=>console.log(j.version)).catch(()=>process.exit(1))" \
+    2>/dev/null
+}
+
+# Same flags the server was set up with by hand; keep them in sync if that ever changes.
+start_container() {
+  docker run -d --name "$CONTAINER" --restart unless-stopped \
+    -p 127.0.0.1:3000:3000 \
+    --memory 1536m \
+    --env-file "$ENV_FILE" \
+    --log-driver json-file --log-opt max-size=20m --log-opt max-file=5 \
+    "$IMAGE:$1" >/dev/null
+}
+
+wait_for_version() {
+  local i
+  for i in $(seq 1 30); do
+    [ "$(running_version || true)" = "$1" ] && return 0
+    sleep 2
+  done
+  return 1
+}
+
+read -r ACTION ARG EXTRA <<<"${SSH_ORIGINAL_COMMAND:-}" || true
+
+case "${ACTION:-}" in
+  status)
+    running_version || die "container $CONTAINER is not answering"
+    exit 0
+    ;;
+  deploy) ;;
+  *) die "usage: deploy vX.Y.Z | status" ;;
+esac
+
+if [ -n "${EXTRA:-}" ] || ! [[ "${ARG:-}" =~ ^v([0-9]+\.[0-9]+\.[0-9]+)$ ]]; then
+  die "expected one tag like v1.2.3, got: ${SSH_ORIGINAL_COMMAND:-}"
+fi
+TAG=$ARG
+VERSION=${BASH_REMATCH[1]}
+
+exec 9>/tmp/chatpush-mcp-deploy.lock
+flock -n 9 || die "another deploy is running"
+
+cd "$REPO_DIR"
+git fetch --quiet --force --tags origin
+git fetch --quiet origin main
+git rev-parse -q --verify "refs/tags/$TAG^{commit}" >/dev/null || die "tag $TAG not found on GitHub"
+# Only reviewed code goes live: the tag has to be on main.
+git merge-base --is-ancestor "refs/tags/$TAG^{commit}" origin/main || die "$TAG is not on main"
+
+PREV_IMAGE=$(docker inspect -f '{{.Config.Image}}' "$CONTAINER" 2>/dev/null || true)
+PREV_VERSION=${PREV_IMAGE#"$IMAGE:"}
+
+if [ "$PREV_IMAGE" = "$IMAGE:$VERSION" ] && [ "$(running_version || true)" = "$VERSION" ]; then
+  log "$VERSION is already running, nothing to do"
+  exit 0
+fi
+
+if docker image inspect "$IMAGE:$VERSION" >/dev/null 2>&1; then
+  log "image $IMAGE:$VERSION already built"
+else
+  git -c advice.detachedHead=false checkout --quiet --force "refs/tags/$TAG"
+  grep -q "\"version\": \"$VERSION\"" package.json || die "package.json in $TAG is not version $VERSION"
+  log "building $IMAGE:$VERSION"
+  docker build --quiet --pull -t "$IMAGE:$VERSION" . >/dev/null
+fi
+
+log "switching ${PREV_VERSION:-nothing} -> $VERSION"
+docker rm -f "$CONTAINER" >/dev/null 2>&1 || true
+start_container "$VERSION"
+
+if ! wait_for_version "$VERSION"; then
+  log "$VERSION did not come up; last log lines:"
+  docker logs --tail 50 "$CONTAINER" 2>&1 || true
+  docker rm -f "$CONTAINER" >/dev/null 2>&1 || true
+  if [ -n "$PREV_IMAGE" ]; then
+    start_container "$PREV_VERSION"
+    if wait_for_version "$PREV_VERSION"; then
+      log "rolled back to $PREV_VERSION"
+    else
+      log "rollback to $PREV_VERSION did not come up either, server is DOWN"
+    fi
+  fi
+  die "deploy of $VERSION failed"
+fi
+
+log "$VERSION is live"
+
+# Keep the newest few images (the running one and the previous one always), drop the rest.
+docker images "$IMAGE" --format '{{.Repository}}:{{.Tag}}' \
+  | tail -n +$((KEEP_IMAGES + 1)) \
+  | { grep -vxF -e "$IMAGE:$VERSION" -e "${PREV_IMAGE:-$IMAGE:$VERSION}" || true; } \
+  | xargs -r docker rmi >/dev/null 2>&1 || true
+docker image prune -f >/dev/null 2>&1 || true

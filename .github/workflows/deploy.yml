@@ -1,0 +1,74 @@
+# Deploys a release tag to the hosted server https://mcp.chatpush.ru over SSH.
+# - Runs automatically from release.yml after a tag is published.
+# - Run it by hand (Actions → Deploy → Run workflow, from main) to redeploy or roll back to any vX.Y.Z.
+# The SSH key can only start /usr/local/bin/chatpush-mcp-deploy on the server (see deploy/README.md).
+# Needs the `production` environment with the DEPLOY_SSH_KEY secret.
+name: Deploy
+
+on:
+  workflow_call:
+    inputs:
+      tag:
+        type: string
+        required: true
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: "Release tag to deploy or roll back to, e.g. v1.1.1"
+        type: string
+        required: true
+
+permissions:
+  contents: read
+
+concurrency:
+  group: deploy-production
+  cancel-in-progress: false
+
+env:
+  DEPLOY_HOST: mcp.chatpush.ru
+  DEPLOY_USER: deploy
+  # Public host key of mcp.chatpush.ru (ssh-keyscan), so a spoofed server can't take the connection.
+  DEPLOY_KNOWN_HOSTS: "mcp.chatpush.ru ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIJ33kqLp4riQ4pxRjc6Fn3gLT72w4zYZOkYbO5ojj8f7"
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    environment:
+      name: production
+      url: https://mcp.chatpush.ru/
+    steps:
+      - name: Check the tag
+        env:
+          TAG: ${{ inputs.tag }}
+        run: |
+          [[ "$TAG" =~ ^v[0-9]+\.[0-9]+\.[0-9]+$ ]] || { echo "::error::Expected a tag like v1.2.3, got '$TAG'"; exit 1; }
+          echo "TAG=$TAG" >> "$GITHUB_ENV"
+          echo "VERSION=${TAG#v}" >> "$GITHUB_ENV"
+
+      - name: Deploy over SSH
+        env:
+          DEPLOY_SSH_KEY: ${{ secrets.DEPLOY_SSH_KEY }}
+        run: |
+          [ -n "$DEPLOY_SSH_KEY" ] || { echo "::error::DEPLOY_SSH_KEY is not set in the production environment"; exit 1; }
+          install -m 700 -d ~/.ssh
+          printf '%s\n' "$DEPLOY_SSH_KEY" > ~/.ssh/deploy_key
+          chmod 600 ~/.ssh/deploy_key
+          printf '%s\n' "$DEPLOY_KNOWN_HOSTS" > ~/.ssh/known_hosts
+          ssh -i ~/.ssh/deploy_key -o IdentitiesOnly=yes -o BatchMode=yes -o StrictHostKeyChecking=yes \
+            -o ConnectTimeout=20 "$DEPLOY_USER@$DEPLOY_HOST" "deploy $TAG"
+
+      - name: Check the public endpoint
+        run: |
+          for i in $(seq 1 10); do
+            GOT="$(curl -fsS https://mcp.chatpush.ru/ | jq -r .version || true)"
+            [ "$GOT" = "$VERSION" ] && { echo "https://mcp.chatpush.ru/ reports $GOT"; exit 0; }
+            echo "Public endpoint reports '$GOT', waiting for $VERSION ($i/10)..."; sleep 6
+          done
+          echo "::error::https://mcp.chatpush.ru/ does not report $VERSION"
+          exit 1
+
+      - name: Remove the key
+        if: always()
+        run: rm -f ~/.ssh/deploy_key
