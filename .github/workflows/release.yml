@@ -2,6 +2,7 @@
 #   1. npm package (trusted publishing, provenance — no npm token or OTP needed)
 #   2. GitHub release with the Claude Desktop extension (.mcpb)
 #   3. Official MCP Registry entry (GitHub OIDC)
+#   4. Deploy to https://mcp.chatpush.ru (deploy.yml, SSH; see deploy/README.md)
 # Each step skips work that is already done, so a failed run can simply be re-run.
 name: Release
 
@@ -102,3 +103,13 @@ jobs:
           ./mcp-publisher validate
           ./mcp-publisher login github-oidc
           ./mcp-publisher publish
+
+  # 4. Hosted server https://mcp.chatpush.ru (see deploy/README.md)
+  deploy:
+    needs: release
+    permissions:
+      contents: read
+    uses: ./.github/workflows/deploy.yml
+    with:
+      tag: ${{ github.ref_name }}
+    secrets: inherit
